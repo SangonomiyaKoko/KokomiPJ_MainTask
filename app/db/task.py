@@ -5,11 +5,70 @@ from dbutils.pooled_db import PooledDB
 
 from app.response import JSONResponse
 from app.log import ExceptionLogger
-from app.utils import UtilityFunctions, BinaryGeneratorUtils, BinaryParserUtils
+from app.utils import BinaryGeneratorUtils, BinaryParserUtils
+from app.core import EnvConfig
+
+config = EnvConfig.get_config()
+
+# 创建连接池
+pool = None
+
+# 初始化连接池
+def init_db_pool():
+    global pool
+    # 使用 global 关键字声明修改的是全局变量
+    # 如果没有使用 global，会认为你在函数内部创建了一个局部变量，而不是修改全局变量
+    try:
+        pool = PooledDB(
+            creator=pymysql,
+            maxconnections=10,  # 最大连接数
+            mincached=1,        # 初始化时，连接池中至少创建的空闲的连接
+            maxcached=5,        # 最大缓存的连接
+            blocking=True,      # 连接池中如果没有可用连接后，是否阻塞
+            host=config.MYSQL_HOST,
+            user=config.MYSQL_USERNAME,
+            password=config.MYSQL_PASSWORD,
+            charset='utf8mb4',
+            connect_timeout=10
+        )
+    except Exception as e:
+        print(e)
+
+# 释放资源
+def close_db_pool():
+    if pool:
+        pool.close()
 
 
 @ExceptionLogger.handle_database_exception_sync
-def check_game_version(pool: PooledDB, game_data: dict):
+def test_db():
+    '''测试'''
+    conn = pool.connection()
+    cur = None
+    try:
+        conn.begin()
+        cur = conn.cursor(pymysql.cursors.DictCursor)
+        
+        cur.execute(
+            "SELECT VERSION();"
+        )
+        version = cur.fetchone()
+        data = {
+            'version': version['version']
+        }
+        
+        conn.commit()
+        return JSONResponse.get_success_response(data)
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        if cur:
+            cur.close()
+        conn.close()  # 归还连接到连接池
+
+@ExceptionLogger.handle_database_exception_sync
+def check_game_version(game_data: dict):
     '''检查游戏版本是否更改
     
     参数:
@@ -48,7 +107,7 @@ def check_game_version(pool: PooledDB, game_data: dict):
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def check_user_basic(pool: PooledDB, user_data: dict):
+def check_user_basic(user_data: dict):
     '''检查用户数据是否需要更新
 
     参数:
@@ -72,7 +131,7 @@ def check_user_basic(pool: PooledDB, user_data: dict):
         if not user:
             cur.execute(
                 "INSERT INTO kokomi.user_basic (account_id, region_id, username) VALUES (%s, %s, %s);",
-                [account_id, region_id, UtilityFunctions.get_user_default_name(account_id)]
+                [account_id, region_id, f'User_{account_id}']
             )
             cur.execute(
                 "INSERT INTO kokomi.user_info (account_id) VALUES (%s);",
@@ -118,7 +177,7 @@ def check_user_basic(pool: PooledDB, user_data: dict):
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def check_clan_basic(pool: PooledDB, clan_data: dict):
+def check_clan_basic(clan_data: dict):
     '''检查clan_basic是否需要更新
 
     参数：
@@ -143,7 +202,7 @@ def check_clan_basic(pool: PooledDB, clan_data: dict):
             # 工会不存在，插入新数据
             cur.execute(
                 "INSERT INTO kokomi.clan_basic (clan_id, region_id, tag, league) VALUES (%s, %s, %s, %s);", 
-                [clan_id, region_id, UtilityFunctions.get_clan_default_name(), 5]
+                [clan_id, region_id, 'N/A', 5]
             )
             cur.execute(
                 "INSERT INTO kokomi.clan_info (clan_id) VALUES (%s);", 
@@ -178,7 +237,7 @@ def check_clan_basic(pool: PooledDB, clan_data: dict):
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def check_user_info(pool: PooledDB, user_data: dict):
+def check_user_info(user_data: dict):
     '''检查并更新user_info表
 
     参数:
@@ -201,7 +260,7 @@ def check_user_info(pool: PooledDB, user_data: dict):
         if user is None:
             # 正常来说这里不应该会遇到为空问题，因为先检查basic在检查info
             conn.commit()
-            return JSONResponse.API_1008_UserNotExistinDatabase
+            return {'status': 'ok','code': 1008,'message': 'UserNotExistinDatabase','data' : None}
         sql_str = ''
         params = []
         for field in ['is_active', 'active_level', 'is_public', 'total_battles', 'last_battle_time']:
@@ -230,7 +289,7 @@ def check_user_info(pool: PooledDB, user_data: dict):
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def check_clan_info(pool: PooledDB, clan_data: dict):
+def check_clan_info(clan_data: dict):
     '''检查并更新user_info表
 
     参数:
@@ -254,7 +313,7 @@ def check_clan_info(pool: PooledDB, clan_data: dict):
         if clan is None:
             # 正常来说这里不应该会遇到为空问题，因为先检查basic在检查info
             conn.commit()
-            return JSONResponse.API_1009_ClanNotExistinDatabase
+            return {'status': 'ok','code': 1009,'message': 'ClanNotExistinDatabase','data' : None}
         if clan_data['is_active'] == False:
             cur.execute(
                 "UPDATE kokomi.clan_info SET is_active = %s, updated_at = CURRENT_TIMESTAMP WHERE clan_id = %s;",
@@ -298,7 +357,7 @@ def check_clan_info(pool: PooledDB, clan_data: dict):
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def check_user_recent(pool: PooledDB, user_data: dict):
+def check_user_recent(user_data: dict):
     '''检查并更新recent表
 
     参数:
@@ -348,7 +407,7 @@ def check_user_recent(pool: PooledDB, user_data: dict):
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def update_user_ship(pool: PooledDB, user_data: dict):
+def update_user_ship(user_data: dict):
     '''检查并更新user_ship表
 
     参数:
@@ -398,7 +457,7 @@ def update_user_ship(pool: PooledDB, user_data: dict):
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def update_clan_users(pool: PooledDB, clan_id: int, hash_value, user_data: list):
+def update_clan_users(clan_id: int, hash_value, user_data: list):
     '''更新clan_users表'''
     conn = pool.connection()
     cur = None
@@ -414,7 +473,7 @@ def update_clan_users(pool: PooledDB, clan_id: int, hash_value, user_data: list)
         clan = cur.fetchone()
         if clan is None:
             conn.commit()
-            return JSONResponse.API_1009_ClanNotExistinDatabase
+            return {'status': 'ok','code': 1009,'message': 'ClanNotExistinDatabase','data' : None}
         # 判断是否有工会人员变动
         join_user_list = []
         leave_user_list = []
@@ -454,7 +513,7 @@ def update_clan_users(pool: PooledDB, clan_id: int, hash_value, user_data: list)
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def update_users_clan(pool: PooledDB, clan_id: int, user_data: list):
+def update_users_clan(clan_id: int, user_data: list):
     '''更新user_clan表'''
     conn = pool.connection()
     cur = None
@@ -485,7 +544,7 @@ def update_users_clan(pool: PooledDB, clan_id: int, user_data: list):
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def update_user_ships(pool: PooledDB, user_data: dict):
+def update_user_ships(user_data: dict):
     '''检查并更新user_ships表
 
     参数:
@@ -529,7 +588,7 @@ def update_user_ships(pool: PooledDB, user_data: dict):
         conn.close()  # 归还连接到连接池
 
 @ExceptionLogger.handle_database_exception_sync
-def update_user_clan(pool: PooledDB, user_data: dict):
+def update_user_clan(user_data: dict):
     '''更新user_clan表
 
     此函数不能用来批量更新数据
