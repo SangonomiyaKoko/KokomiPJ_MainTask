@@ -10,6 +10,10 @@ class LoadConfig(BaseSettings):
     MYSQL_USERNAME: str
     MYSQL_PASSWORD: str
 
+    DB_NAME_MAIN: str
+    DB_NAME_BOT: str
+    DB_NAME_SHIP: str
+
     RABBITMQ_HOST: str
     RABBITMQ_USERNAME: str
     RABBITMQ_PASSWORD: str
@@ -21,10 +25,10 @@ class EnvConfig:
     __cache = None
 
     @classmethod
-    def get_config(self) -> LoadConfig:
-        if self.__cache is None:
+    def get_config(cls) -> LoadConfig:
+        if cls.__cache is None:
             config = LoadConfig()
-            self.__cache = config
+            cls.__cache = config
             return config
         else:
-            return self.__cache
+            return cls.__cache

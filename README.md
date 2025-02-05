@@ -2,11 +2,47 @@
 
 这里是负责后台任务模块
 
-Celery 文档: <https://docs.celeryq.dev/en/latest/index.html>
+Celery 官方文档: <https://docs.celeryq.dev/en/latest/index.html>
 
 ## 启动步骤
 
-### 启动 Celery Worker
+### 一. 从 Github 下载最新的代码
+
+```bash
+git clone https://github.com/SangonomiyaKoko/KokomiPJ_MainTask.git
+```
+
+> 没有 git 先安装 git
+
+### 二. 创建并激活虚拟环境
+
+推荐的 Python 版本: 至少`3.8.0`及以上
+
+```bash
+apt install python3.12-venv # 可能需要，以3.12版本为例
+
+python/python3 -m venv .venv
+
+activate
+# 或者
+.venv/Scripts/activate
+# 或者
+source .venv/bin/activate
+```
+
+### 三. 安装依赖
+
+```bash
+pip install -r requirements.txt # 安装python依赖
+```
+
+### 四. 安装 RabbitMQ
+
+```bash
+
+```
+
+### 五. 启动 Celery Worker
 
 ```bash
 # 单个 worker

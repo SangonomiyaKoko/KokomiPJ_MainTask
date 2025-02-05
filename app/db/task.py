@@ -39,6 +39,10 @@ def close_db_pool():
     if pool:
         pool.close()
 
+MAIN_DB = config.DB_NAME_MAIN
+BOT_DB = config.DB_NAME_BOT
+CACHE_DB = config.DB_NAME_SHIP
+
 
 @ExceptionLogger.handle_database_exception_sync
 def test_db():
@@ -83,7 +87,7 @@ def check_game_version(game_data: dict):
         region_id = game_data['region_id']
         game_version = game_data['version']
         cur.execute(
-            "SELECT game_version FROM kokomi.region_version WHERE region_id = %s;",
+            f"SELECT game_version FROM {MAIN_DB}.region_version WHERE region_id = %s;",
             [region_id]
         )
         game = cur.fetchone()
@@ -92,7 +96,7 @@ def check_game_version(game_data: dict):
         else:
             if game['game_version'] != game_version:
                 cur.execute(
-                    "UPDATE kokomi.region_version SET game_version = %s WHERE region_id = %s;",
+                    f"UPDATE {MAIN_DB}.region_version SET game_version = %s WHERE region_id = %s;",
                     [game_version, region_id]
                 )
         
@@ -124,45 +128,46 @@ def check_user_basic(user_data: dict):
         nickname = user_data['nickname']
         cur.execute(
             "SELECT username, UNIX_TIMESTAMP(updated_at) AS update_time "
-            "FROM kokomi.user_basic WHERE region_id = %s and account_id = %s;", 
+            f"FROM {MAIN_DB}.user_basic WHERE region_id = %s and account_id = %s;", 
             [region_id, account_id]
         )
         user = cur.fetchone()
         if not user:
             cur.execute(
-                "INSERT INTO kokomi.user_basic (account_id, region_id, username) VALUES (%s, %s, %s);",
+                f"INSERT INTO {MAIN_DB}.user_basic (account_id, region_id, username) VALUES (%s, %s, %s);",
                 [account_id, region_id, f'User_{account_id}']
             )
             cur.execute(
-                "INSERT INTO kokomi.user_info (account_id) VALUES (%s);",
+                f"INSERT INTO {MAIN_DB}.user_info (account_id) VALUES (%s);",
                 [account_id]
             )
             cur.execute(
-                "INSERT INTO kokomi.user_ships (account_id) VALUES (%s);",
+                f"INSERT INTO {MAIN_DB}.user_ships (account_id) VALUES (%s);",
                 [account_id]
             )
             cur.execute(
-                "INSERT INTO kokomi.user_clan (account_id) VALUES (%s);",
+                f"INSERT INTO {MAIN_DB}.user_clan (account_id) VALUES (%s);",
                 [account_id]
             )
             cur.execute(
-                "UPDATE kokomi.user_basic SET username = %s WHERE region_id = %s AND account_id = %s",
+                f"UPDATE {MAIN_DB}.user_basic SET username = %s WHERE region_id = %s AND account_id = %s",
                 [nickname, region_id, account_id]
             )
         else:
             # 根据数据库的数据判断用户是否更改名称
             if user['username'] != nickname and user['update_time'] != None:
                 cur.execute(
-                    "UPDATE kokomi.user_basic SET username = %s WHERE region_id = %s and account_id = %s;", 
+                    f"UPDATE {MAIN_DB}.user_basic SET username = %s WHERE region_id = %s and account_id = %s;", 
                     [nickname, region_id, account_id]
                 )
                 cur.execute(
-                    "INSERT INTO kokomi.user_history (account_id, username, start_time, end_time) VALUES (%s, %s, FROM_UNIXTIME(%s), FROM_UNIXTIME(%s));", 
+                    f"INSERT INTO {MAIN_DB}.user_history (account_id, username, start_time, end_time) VALUES "
+                    "(%s, %s, FROM_UNIXTIME(%s), FROM_UNIXTIME(%s));", 
                     [account_id, user['username'], user['update_time'], int(time.time())]
                 )
             elif user['update_time'] == None:
                 cur.execute(
-                    "UPDATE kokomi.user_basic SET username = %s WHERE region_id = %s and account_id = %s;",
+                    f"UPDATE {MAIN_DB}.user_basic SET username = %s WHERE region_id = %s and account_id = %s;",
                     [nickname, region_id, account_id]
                 )
         
@@ -194,35 +199,36 @@ def check_clan_basic(clan_data: dict):
         tag = clan_data['tag']
         league = clan_data['league']
         cur.execute(
-            "SELECT tag, league FROM kokomi.clan_basic WHERE region_id = %s and clan_id = %s;", 
+            f"SELECT tag, league FROM {MAIN_DB}.clan_basic WHERE region_id = %s and clan_id = %s;", 
             [region_id, clan_id]
         )
         clan = cur.fetchone()
         if clan is None:
             # 工会不存在，插入新数据
             cur.execute(
-                "INSERT INTO kokomi.clan_basic (clan_id, region_id, tag, league) VALUES (%s, %s, %s, %s);", 
+                f"INSERT INTO {MAIN_DB}.clan_basic (clan_id, region_id, tag, league) VALUES (%s, %s, %s, %s);", 
                 [clan_id, region_id, 'N/A', 5]
             )
             cur.execute(
-                "INSERT INTO kokomi.clan_info (clan_id) VALUES (%s);", 
+                f"INSERT INTO {MAIN_DB}.clan_info (clan_id) VALUES (%s);", 
                 [clan_id]
             )
             cur.execute(
-                "INSERT INTO kokomi.clan_users (clan_id) VALUES (%s);", 
+                f"INSERT INTO {MAIN_DB}.clan_users (clan_id) VALUES (%s);", 
                 [clan_id]
             )
             cur.execute(
-                "INSERT INTO kokomi.clan_season (clan_id) VALUES (%s);", 
+                f"INSERT INTO {MAIN_DB}.clan_season (clan_id) VALUES (%s);", 
                 [clan_id]
             )
             cur.execute(
-                "UPDATE kokomi.clan_basic SET tag = %s, league = %s WHERE region_id = %s and clan_id = %s;",
+                f"UPDATE {MAIN_DB}.clan_basic SET tag = %s, league = %s WHERE region_id = %s and clan_id = %s;",
                 [tag, league, region_id, clan_id]
             )
         else:
             cur.execute(
-                "UPDATE kokomi.clan_basic SET tag = %s, league = %s, updated_at = CURRENT_TIMESTAMP WHERE region_id = %s and clan_id = %s;",
+                f"UPDATE {MAIN_DB}.clan_basic SET tag = %s, league = %s, updated_at = CURRENT_TIMESTAMP "
+                "WHERE region_id = %s and clan_id = %s;",
                 [tag, league, region_id, clan_id]
             )
         
@@ -253,7 +259,7 @@ def check_user_info(user_data: dict):
         account_id = user_data['account_id']
         cur.execute(
             "SELECT is_active, active_level, is_public, total_battles, UNIX_TIMESTAMP(last_battle_at) AS last_battle_time "
-            "FROM kokomi.user_info WHERE account_id = %s;", 
+            f"FROM {MAIN_DB}.user_info WHERE account_id = %s;", 
             [account_id]
         )
         user = cur.fetchone()
@@ -274,7 +280,7 @@ def check_user_info(user_data: dict):
                         params.append(user_data[field])
         params = params + [account_id]
         cur.execute(
-            f"UPDATE kokomi.user_info SET {sql_str}updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;", 
+            f"UPDATE {MAIN_DB}.user_info SET {sql_str}updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;", 
             params
         )
 
@@ -306,7 +312,7 @@ def check_clan_info(clan_data: dict):
         cur.execute(
             "SELECT is_active, season, public_rating, league, division, division_rating, "
             "UNIX_TIMESTAMP(last_battle_at) AS last_battle_time "
-            "FROM kokomi.clan_info WHERE clan_id = %s;", 
+            f"FROM {MAIN_DB}.clan_info WHERE clan_id = %s;", 
             [clan_id]
         )
         clan = cur.fetchone()
@@ -316,7 +322,7 @@ def check_clan_info(clan_data: dict):
             return {'status': 'ok','code': 1009,'message': 'ClanNotExistinDatabase','data' : None}
         if clan_data['is_active'] == False:
             cur.execute(
-                "UPDATE kokomi.clan_info SET is_active = %s, updated_at = CURRENT_TIMESTAMP WHERE clan_id = %s;",
+                f"UPDATE {MAIN_DB}.clan_info SET is_active = %s, updated_at = CURRENT_TIMESTAMP WHERE clan_id = %s;",
                 [0, clan_id]
             )
         else:
@@ -327,7 +333,7 @@ def check_clan_info(clan_data: dict):
             ):
                 if clan_data['last_battle_at']:
                     cur.execute(
-                        "UPDATE kokomi.clan_info SET is_active = %s, season = %s, public_rating = %s, league = %s, "
+                        f"UPDATE {MAIN_DB}.clan_info SET is_active = %s, season = %s, public_rating = %s, league = %s, "
                         "division = %s, division_rating = %s, last_battle_at = FROM_UNIXTIME(%s) "
                         "WHERE clan_id = %s",
                         [
@@ -337,7 +343,7 @@ def check_clan_info(clan_data: dict):
                     )
                 else:
                     cur.execute(
-                        "UPDATE kokomi.clan_info SET is_active = %s, season = %s, public_rating = %s, league = %s, "
+                        f"UPDATE {MAIN_DB}.clan_info SET is_active = %s, season = %s, public_rating = %s, league = %s, "
                         "division = %s, division_rating = %s "
                         "WHERE clan_id = %s",
                         [
@@ -373,7 +379,7 @@ def check_user_recent(user_data: dict):
         region_id = user_data['region_id']
         cur.execute(
             "SELECT recent_class, UNIX_TIMESTAMP(last_update_at) AS last_update_time "
-            "FROM kokomi.recent WHERE region_id = %s and account_id = %s;", 
+            f"FROM {MAIN_DB}.recent WHERE region_id = %s and account_id = %s;", 
             [region_id, account_id]
         )
         user = cur.fetchone()
@@ -382,17 +388,17 @@ def check_user_recent(user_data: dict):
             return JSONResponse.API_1000_Success
         if user_data['recent_class'] and (user['recent_class'] != user_data['recent_class']):
             cur.execute(
-                "UPDATE kokomi.recent SET recent_class = %s WHERE region_id = %s and account_id = %s;",
+                f"UPDATE {MAIN_DB}.recent SET recent_class = %s WHERE region_id = %s and account_id = %s;",
                 [user_data['recent_class'], region_id, account_id]
             )
         if not user['last_update_time']:
             cur.execute(
-                "UPDATE kokomi.recent SET last_update_at = FROM_UNIXTIME(%s) WHERE region_id = %s and account_id = %s;",
+                f"UPDATE {MAIN_DB}.recent SET last_update_at = FROM_UNIXTIME(%s) WHERE region_id = %s and account_id = %s;",
                 [user_data['last_update_time'], region_id, account_id]
             )
         elif user_data['last_update_time'] and (user['last_update_time'] > user_data['last_update_time']):
             cur.execute(
-                "UPDATE kokomi.recent SET last_update_at = FROM_UNIXTIME(%s) WHERE region_id = %s and account_id = %s;",
+                f"UPDATE {MAIN_DB}.recent SET last_update_at = FROM_UNIXTIME(%s) WHERE region_id = %s and account_id = %s;",
                 [user_data['last_update_time'], region_id, account_id]
             )
         
@@ -425,24 +431,24 @@ def update_user_ship(user_data: dict):
         replace_ship_dict = user_data['replace_ship_dict']
         for del_ship_id in delete_ship_list:
             cur.execute(
-                "DELETE FROM ships.ship_%s "
+                f"DELETE FROM {CACHE_DB}.ship_%s "
                 "WHERE region_id = %s AND account_id = %s;",
                 [int(del_ship_id), region_id, account_id]
             )
         for update_ship_id, ship_data in replace_ship_dict.items():
             cur.execute(
-                "UPDATE ships.ship_%s SET battles_count = %s, battle_type_1 = %s, battle_type_2 = %s, battle_type_3 = %s, wins = %s, "
+                f"UPDATE {CACHE_DB}.ship_%s SET battles_count = %s, battle_type_1 = %s, battle_type_2 = %s, battle_type_3 = %s, wins = %s, "
                 "damage_dealt = %s, frags = %s, exp = %s, survived = %s, scouting_damage = %s, art_agro = %s, "
                 "planes_killed = %s, max_exp = %s, max_damage_dealt = %s, max_frags = %s "
                 "WHERE region_id = %s AND account_id = %s;",
                 [int(update_ship_id)] + ship_data + [region_id, account_id]
             )
             cur.execute(
-                "INSERT INTO ships.ship_%s (account_id, region_id, battles_count, battle_type_1, battle_type_2, "
+                f"INSERT INTO {CACHE_DB}.ship_%s (account_id, region_id, battles_count, battle_type_1, battle_type_2, "
                 "battle_type_3, wins, damage_dealt, frags, exp, survived, scouting_damage, art_agro, planes_killed, "
                 "max_exp, max_damage_dealt, max_frags) "
                 "SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "
-                "WHERE NOT EXISTS (SELECT 1 FROM ships.ship_%s WHERE region_id = %s AND account_id = %s);",
+                f"WHERE NOT EXISTS (SELECT 1 FROM {CACHE_DB}.ship_%s WHERE region_id = %s AND account_id = %s);",
                 [int(update_ship_id)] + [account_id, region_id] + ship_data + [int(update_ship_id)] + [region_id, account_id]
             )
         
@@ -467,7 +473,7 @@ def update_clan_users(clan_id: int, hash_value, user_data: list):
 
         cur.execute(
             "SELECT hash_value, users_data, users_data, UNIX_TIMESTAMP(updated_at) AS update_time "
-            "FROM kokomi.clan_users WHERE clan_id = %s;", 
+            f"FROM {MAIN_DB}.clan_users WHERE clan_id = %s;", 
             [clan_id]
         )
         clan = cur.fetchone()
@@ -486,19 +492,19 @@ def update_clan_users(clan_id: int, hash_value, user_data: list):
                 if account_id not in user_data:
                     leave_user_list.append(account_id)
         cur.execute(
-            "UPDATE kokomi.clan_users "
+            f"UPDATE {MAIN_DB}.clan_users "
             "SET hash_value = %s, users_data = %s, updated_at = CURRENT_TIMESTAMP "
             "WHERE clan_id = %s",
             [hash_value, BinaryGeneratorUtils.to_clan_binary_data_from_list(user_data),clan_id]
         )
         for account_id in join_user_list:
             cur.execute(
-                "INSERT INTO kokomi.clan_history (account_id, clan_id, action_type) VALUES (%s, %s, %s);",
+                f"INSERT INTO {MAIN_DB}.clan_history (account_id, clan_id, action_type) VALUES (%s, %s, %s);",
                 [account_id, clan_id, 1]
             )
         for account_id in leave_user_list:
             cur.execute(
-                "INSERT INTO kokomi.clan_history (account_id, clan_id, action_type) VALUES (%s, %s, %s);",
+                f"INSERT INTO {MAIN_DB}.clan_history (account_id, clan_id, action_type) VALUES (%s, %s, %s);",
                 [account_id, clan_id, 2]
             )
         
@@ -527,7 +533,7 @@ def update_users_clan(clan_id: int, user_data: list):
             sql_str += ', %s'
             params.append(aid)
         cur.execute(
-            "UPDATE kokomi.user_clan "
+            f"UPDATE {MAIN_DB}.user_clan "
             "SET clan_id = %s, updated_at = CURRENT_TIMESTAMP "
             f"WHERE account_id IN ( %s{sql_str} );", 
             [clan_id] + [user_data[0]] + params
@@ -559,7 +565,7 @@ def update_user_ships(user_data: dict):
         account_id = user_data['account_id']
         if user_data['hash_value']:
             cur.execute(
-                "UPDATE kokomi.user_ships "
+                f"UPDATE {MAIN_DB}.user_ships "
                 "SET battles_count = %s, hash_value = %s, ships_data = %s, updated_at = CURRENT_TIMESTAMP "
                 "WHERE account_id = %s;", 
                 [
@@ -571,7 +577,7 @@ def update_user_ships(user_data: dict):
             )
         else:
             cur.execute(
-                "UPDATE kokomi.user_ships "
+                f"UPDATE {MAIN_DB}.user_ships "
                 "SET battles_count = %s, updated_at = CURRENT_TIMESTAMP "
                 "WHERE account_id = %s;", 
                 [user_data['battles_count'], account_id]
@@ -606,12 +612,12 @@ def update_user_clan(user_data: dict):
         clan_id = user_data['clan_id']
         if clan_id:
             cur.execute(
-                "UPDATE kokomi.user_clan SET clan_id = %s, updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;",
+                f"UPDATE {MAIN_DB}.user_clan SET clan_id = %s, updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;",
                 [clan_id, account_id]
             )
         else:
             cur.execute(
-                "UPDATE kokomi.user_clan SET clan_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;",
+                f"UPDATE {MAIN_DB}.user_clan SET clan_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;",
                 [account_id]
             )
 
