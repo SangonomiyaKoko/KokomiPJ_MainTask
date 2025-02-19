@@ -1,6 +1,5 @@
+from .db import DatabaseConnection
 from .task import (
-    init_db_pool, 
-    close_db_pool,
     test_db,
     check_game_version,
     check_user_basic, 
@@ -12,11 +11,12 @@ from .task import (
     update_user_ships,
     update_clan_users,
     check_clan_info,
-    update_users_clan
+    update_users_clan,
+    update_clan_basic_and_info,
+    check_and_insert_missing_users
 )
 __all__ = [
-    'init_db_pool', 
-    'close_db_pool',
+    'DatabaseConnection',
 
     'test_db',
     'check_game_version',
@@ -29,5 +29,7 @@ __all__ = [
     'update_user_ships',
     'update_clan_users',
     'check_clan_info',
-    'update_users_clan'
+    'update_users_clan',
+    'update_clan_basic_and_info',
+    'check_and_insert_missing_users'
 ]

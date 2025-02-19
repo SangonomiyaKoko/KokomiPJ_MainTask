@@ -1,43 +1,14 @@
-import time
-
 import pymysql
 from dbutils.pooled_db import PooledDB
 
 from app.response import JSONResponse
 from app.log import ExceptionLogger
-from app.utils import BinaryGeneratorUtils, BinaryParserUtils
+from app.utils import BinaryGeneratorUtils, BinaryParserUtils, TimeFormat
 from app.core import EnvConfig
 
+from .db import DatabaseConnection
+
 config = EnvConfig.get_config()
-
-# 创建连接池
-pool = None
-
-# 初始化连接池
-def init_db_pool():
-    global pool
-    # 使用 global 关键字声明修改的是全局变量
-    # 如果没有使用 global，会认为你在函数内部创建了一个局部变量，而不是修改全局变量
-    try:
-        pool = PooledDB(
-            creator=pymysql,
-            maxconnections=10,  # 最大连接数
-            mincached=1,        # 初始化时，连接池中至少创建的空闲的连接
-            maxcached=5,        # 最大缓存的连接
-            blocking=True,      # 连接池中如果没有可用连接后，是否阻塞
-            host=config.MYSQL_HOST,
-            user=config.MYSQL_USERNAME,
-            password=config.MYSQL_PASSWORD,
-            charset='utf8mb4',
-            connect_timeout=10
-        )
-    except Exception as e:
-        print(e)
-
-# 释放资源
-def close_db_pool():
-    if pool:
-        pool.close()
 
 MAIN_DB = config.DB_NAME_MAIN
 BOT_DB = config.DB_NAME_BOT
@@ -47,6 +18,7 @@ CACHE_DB = config.DB_NAME_SHIP
 @ExceptionLogger.handle_database_exception_sync
 def test_db():
     '''测试'''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -69,7 +41,7 @@ def test_db():
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def check_game_version(game_data: dict):
@@ -78,6 +50,7 @@ def check_game_version(game_data: dict):
     参数:
         game_data
     '''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -108,7 +81,7 @@ def check_game_version(game_data: dict):
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def check_user_basic(user_data: dict):
@@ -117,6 +90,7 @@ def check_user_basic(user_data: dict):
     参数:
         user_list [dict]
     '''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -163,7 +137,7 @@ def check_user_basic(user_data: dict):
                 cur.execute(
                     f"INSERT INTO {MAIN_DB}.user_history (account_id, username, start_time, end_time) VALUES "
                     "(%s, %s, FROM_UNIXTIME(%s), FROM_UNIXTIME(%s));", 
-                    [account_id, user['username'], user['update_time'], int(time.time())]
+                    [account_id, user['username'], user['update_time'], TimeFormat.get_current_timestamp()]
                 )
             elif user['update_time'] == None:
                 cur.execute(
@@ -179,7 +153,7 @@ def check_user_basic(user_data: dict):
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def check_clan_basic(clan_data: dict):
@@ -188,6 +162,7 @@ def check_clan_basic(clan_data: dict):
     参数：
         clan_list [clan_id,region_id,tag,league]
     '''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -240,7 +215,7 @@ def check_clan_basic(clan_data: dict):
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def check_user_info(user_data: dict):
@@ -250,6 +225,7 @@ def check_user_info(user_data: dict):
         user_list [dict]
     
     '''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -292,16 +268,94 @@ def check_user_info(user_data: dict):
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()
+
+# @ExceptionLogger.handle_database_exception_sync
+# def update_clan_basic_and_info(clan_data: dict):
+#     '''更新clan_info表
+
+#     更新工会的info数据
+
+#     参数:
+#         clan_data
+    
+#     返回:
+#         ResponseDict
+#     '''
+#     pool = DatabaseConnection.get_pool()
+#     conn = pool.connection()
+#     cur = None
+#     try:
+#         conn.begin()
+#         cur = conn.cursor(pymysql.cursors.DictCursor)
+
+#         clan_id = clan_data['clan_id']
+#         region_id = clan_data['region_id']
+#         cur.execute(
+#             "SELECT b.clan_id, b.tag, b.league, UNIX_TIMESTAMP(b.updated_at) AS basic_update_time, "
+#             "i.is_active, i.season, i.public_rating, i.league, i.division, i.division_rating, "
+#             "UNIX_TIMESTAMP(i.last_battle_at) AS info_last_battle_time "
+#             f"FROM {MAIN_DB}.clan_basic AS b "
+#             f"LEFT JOIN {MAIN_DB}.clan_info AS i ON b.clan_id = i.clan_id "
+#             "WHERE b.region_id = %s AND b.clan_id = %s;",
+#             [region_id, clan_id]
+#         )
+#         clan = cur.fetchone()
+#         if clan == None:
+#             conn.commit()
+#             return {'status': 'ok','code': 1009,'message': 'ClanNotExistinDatabase','data' : None}
+#         if clan_data['is_active'] == 0:
+#             cur.execute(
+#                 f"UPDATE {MAIN_DB}.clan_info SET is_active = %s, updated_at = CURRENT_TIMESTAMP WHERE clan_id = %s;",
+#                 [0, clan_id]
+#             )
+#         else:
+#             current_timestamp = TimeFormat.get_current_timestamp()
+#             if (
+#                 not clan[3] or 
+#                 current_timestamp - clan['basic_update_time'] > 2*24*60*60 or
+#                 (clan_data['tag'] and clan_data['tag'] != clan['b.tag']) or
+#                 clan_data['league'] != clan['b.league']
+#             ):
+#                 cur.execute(
+#                     f"UPDATE {MAIN_DB}.clan_basic SET tag = %s, league = %s, updated_at = CURRENT_TIMESTAMP "
+#                     "WHERE region_id = %s AND clan_id = %s;",
+#                     [clan_data['tag'],clan_data['league'],region_id,clan_id]
+#                 )
+#             if (
+#                 clan_data['season_number'] != clan['i.season'] or
+#                 clan_data['public_rating'] != clan['i.public_rating'] or
+#                 clan_data['last_battle_at'] != clan['info_last_battle_time']
+#             ):
+#                 cur.execute(
+#                     f"UPDATE {MAIN_DB}.clan_info SET is_active = %s, season = %s, public_rating = %s, league = %s, "
+#                     "division = %s, division_rating = %s, last_battle_at = FROM_UNIXTIME(%s) "
+#                     "WHERE clan_id = %s",
+#                     [
+#                         1, clan_data['season_number'], clan_data['public_rating'],clan_data['league'],
+#                         clan_data['division'], clan_data['division_rating'],clan_data['last_battle_at'],clan_id
+#                     ]
+#                 )
+
+#         conn.commit()
+#         return JSONResponse.API_1000_Success
+#     except Exception as e:
+#         conn.rollback()
+#         raise e
+#     finally:
+#         if cur:
+#             cur.close()
+#         conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def check_clan_info(clan_data: dict):
-    '''检查并更新user_info表
+    '''检查并更新clan_info表
 
     参数:
-        user_list [dict]
+        clan_data [dict]
     
     '''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -360,7 +414,7 @@ def check_clan_info(clan_data: dict):
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def check_user_recent(user_data: dict):
@@ -369,6 +423,7 @@ def check_user_recent(user_data: dict):
     参数:
         user_data [dict]
     '''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -410,7 +465,7 @@ def check_user_recent(user_data: dict):
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def update_user_ship(user_data: dict):
@@ -419,6 +474,7 @@ def update_user_ship(user_data: dict):
     参数:
         user_data [dict]
     '''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -460,94 +516,178 @@ def update_user_ship(user_data: dict):
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()
 
-@ExceptionLogger.handle_database_exception_sync
-def update_clan_users(clan_id: int, hash_value, user_data: list):
-    '''更新clan_users表'''
-    conn = pool.connection()
-    cur = None
-    try:
-        conn.begin()
-        cur = conn.cursor(pymysql.cursors.DictCursor)
+# @ExceptionLogger.handle_database_exception_sync
+# def check_and_insert_missing_users(users: list):
+#     '''检查并插入缺失的用户id
 
-        cur.execute(
-            "SELECT hash_value, users_data, users_data, UNIX_TIMESTAMP(updated_at) AS update_time "
-            f"FROM {MAIN_DB}.clan_users WHERE clan_id = %s;", 
-            [clan_id]
-        )
-        clan = cur.fetchone()
-        if clan is None:
-            conn.commit()
-            return {'status': 'ok','code': 1009,'message': 'ClanNotExistinDatabase','data' : None}
-        # 判断是否有工会人员变动
-        join_user_list = []
-        leave_user_list = []
-        if clan['update_time'] and clan['hash_value'] != hash_value:
-            old_user_list = BinaryParserUtils.from_clan_binary_data_to_list(clan['users_data'])
-            for account_id in user_data:
-                if account_id not in old_user_list:
-                    join_user_list.append(account_id)
-            for account_id in old_user_list:
-                if account_id not in user_data:
-                    leave_user_list.append(account_id)
-        cur.execute(
-            f"UPDATE {MAIN_DB}.clan_users "
-            "SET hash_value = %s, users_data = %s, updated_at = CURRENT_TIMESTAMP "
-            "WHERE clan_id = %s",
-            [hash_value, BinaryGeneratorUtils.to_clan_binary_data_from_list(user_data),clan_id]
-        )
-        for account_id in join_user_list:
-            cur.execute(
-                f"INSERT INTO {MAIN_DB}.clan_history (account_id, clan_id, action_type) VALUES (%s, %s, %s);",
-                [account_id, clan_id, 1]
-            )
-        for account_id in leave_user_list:
-            cur.execute(
-                f"INSERT INTO {MAIN_DB}.clan_history (account_id, clan_id, action_type) VALUES (%s, %s, %s);",
-                [account_id, clan_id, 2]
-            )
+#     只支持同一服务器下的用户
+    
+#     参数:
+#         user: [{...}]
+#     '''
+#     pool = DatabaseConnection.get_pool()
+#     conn = pool.connection()
+#     cur = None
+#     try:
+#         conn.begin()
+#         cur = conn.cursor(pymysql.cursors.DictCursor)
+
+#         sql_str = ''
+#         params = [users[0]['region_id'],users[0]['account_id']]
+#         for user in users[1:]:
+#             sql_str += ', %s'
+#             params.append(user['account_id'])
+#         cur.execute(
+#             "SELECT account_id, username, UNIX_TIMESTAMP(updated_at) AS update_time "
+#             f"FROM {MAIN_DB}.user_basic WHERE region_id = %s AND account_id in ( %s{sql_str} );",
+#             params
+#         )
+#         exists_users = {}
+#         rows = cur.fetchall()
+#         for row in rows:
+#             exists_users[row['account_id']] = [row['username'],row['update_time']]
+#         for user in users:
+#             account_id = user[0]
+#             region_id = user[1]
+#             nickname = user[2]
+#             if account_id not in exists_users:
+#                 cur.execute(
+#                     f"INSERT INTO {MAIN_DB}.user_basic (account_id, region_id, username) VALUES (%s, %s, %s);",
+#                     [account_id, region_id, f'User_{account_id}']
+#                 )
+#                 cur.execute(
+#                     f"INSERT INTO {MAIN_DB}.user_info (account_id) VALUES (%s);",
+#                     [account_id]
+#                 )
+#                 cur.execute(
+#                     f"INSERT INTO {MAIN_DB}.user_ships (account_id) VALUES (%s);",
+#                     [account_id]
+#                 )
+#                 cur.execute(
+#                     f"INSERT INTO {MAIN_DB}.user_clan (account_id) VALUES (%s);",
+#                     [account_id]
+#                 )
+#                 cur.execute(
+#                     f"UPDATE {MAIN_DB}.user_basic SET username = %s WHERE region_id = %s AND account_id = %s",
+#                     [nickname, region_id, account_id]
+#                 )
+#             else:
+#                 if exists_users[account_id][1] == None:
+#                     cur.execute(
+#                         f"UPDATE {MAIN_DB}.user_basic SET username = %s WHERE region_id = %s AND account_id = %s",
+#                         [nickname, region_id, account_id]
+#                     )
+#                 elif nickname != exists_users[account_id][0]:
+#                     cur.execute(
+#                         f"UPDATE {MAIN_DB}.user_basic SET username = %s WHERE region_id = %s and account_id = %s;", 
+#                         [nickname, region_id, account_id]
+#                     ) 
+#                     cur.execute(
+#                         f"INSERT INTO {MAIN_DB}.user_history (account_id, username, start_time, end_time) "
+#                         "VALUES (%s, %s, FROM_UNIXTIME(%s), FROM_UNIXTIME(%s));", 
+#                         [account_id, exists_users[account_id][0], exists_users[account_id][1], TimeFormat.get_current_timestamp()]
+#                     )
         
-        conn.commit()
-        return JSONResponse.API_1000_Success
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        if cur:
-            cur.close()
-        conn.close()  # 归还连接到连接池
+#         conn.commit()
+#         return JSONResponse.API_1000_Success
+#     except Exception as e:
+#         conn.rollback()
+#         raise e
+#     finally:
+#         if cur:
+#             cur.close()
+#         conn.close()
 
-@ExceptionLogger.handle_database_exception_sync
-def update_users_clan(clan_id: int, user_data: list):
-    '''更新user_clan表'''
-    conn = pool.connection()
-    cur = None
-    try:
-        conn.begin()
-        cur = conn.cursor(pymysql.cursors.DictCursor)
+# @ExceptionLogger.handle_database_exception_sync
+# def update_clan_users(clan_id: int, hash_value: str, user_data: list):
+#     '''更新clan_users表'''
+#     pool = DatabaseConnection.get_pool()
+#     conn = pool.connection()
+#     cur = None
+#     try:
+#         conn.begin()
+#         cur = conn.cursor(pymysql.cursors.DictCursor)
 
-        sql_str = ''
-        params = []
-        for aid in user_data[1:]:
-            sql_str += ', %s'
-            params.append(aid)
-        cur.execute(
-            f"UPDATE {MAIN_DB}.user_clan "
-            "SET clan_id = %s, updated_at = CURRENT_TIMESTAMP "
-            f"WHERE account_id IN ( %s{sql_str} );", 
-            [clan_id] + [user_data[0]] + params
-        )
+#         cur.execute(
+#             "SELECT hash_value, users_data, users_data, UNIX_TIMESTAMP(updated_at) AS update_time "
+#             f"FROM {MAIN_DB}.clan_users WHERE clan_id = %s;", 
+#             [clan_id]
+#         )
+#         clan = cur.fetchone()
+#         if clan is None:
+#             conn.commit()
+#             return {'status': 'ok','code': 1009,'message': 'ClanNotExistinDatabase','data' : None}
+#         # 判断是否有工会人员变动
+#         join_user_list = []
+#         leave_user_list = []
+#         if clan['update_time'] and clan['hash_value'] != hash_value:
+#             old_user_list = BinaryParserUtils.from_clan_binary_data_to_list(clan['users_data'])
+#             for account_id in user_data:
+#                 if account_id not in old_user_list:
+#                     join_user_list.append(account_id)
+#             for account_id in old_user_list:
+#                 if account_id not in user_data:
+#                     leave_user_list.append(account_id)
+#         cur.execute(
+#             f"UPDATE {MAIN_DB}.clan_users "
+#             "SET hash_value = %s, users_data = %s, updated_at = CURRENT_TIMESTAMP "
+#             "WHERE clan_id = %s",
+#             [hash_value, BinaryGeneratorUtils.to_clan_binary_data_from_list(user_data),clan_id]
+#         )
+#         for account_id in join_user_list:
+#             cur.execute(
+#                 f"INSERT INTO {MAIN_DB}.clan_history (account_id, clan_id, action_type) VALUES (%s, %s, %s);",
+#                 [account_id, clan_id, 1]
+#             )
+#         for account_id in leave_user_list:
+#             cur.execute(
+#                 f"INSERT INTO {MAIN_DB}.clan_history (account_id, clan_id, action_type) VALUES (%s, %s, %s);",
+#                 [account_id, clan_id, 2]
+#             )
+        
+#         conn.commit()
+#         return JSONResponse.API_1000_Success
+#     except Exception as e:
+#         conn.rollback()
+#         raise e
+#     finally:
+#         if cur:
+#             cur.close()
+#         conn.close()
 
-        conn.commit()
-        return JSONResponse.API_1000_Success
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        if cur:
-            cur.close()
-        conn.close()  # 归还连接到连接池
+# @ExceptionLogger.handle_database_exception_sync
+# def update_users_clan(clan_id: int, user_data: list):
+#     '''更新user_clan表'''
+#     pool = DatabaseConnection.get_pool()
+#     conn = pool.connection()
+#     cur = None
+#     try:
+#         conn.begin()
+#         cur = conn.cursor(pymysql.cursors.DictCursor)
+
+#         sql_str = ''
+#         params = []
+#         for aid in user_data[1:]:
+#             sql_str += ', %s'
+#             params.append(aid)
+#         cur.execute(
+#             f"UPDATE {MAIN_DB}.user_clan "
+#             "SET clan_id = %s, updated_at = CURRENT_TIMESTAMP "
+#             f"WHERE account_id IN ( %s{sql_str} );", 
+#             [clan_id] + [user_data[0]] + params
+#         )
+
+#         conn.commit()
+#         return JSONResponse.API_1000_Success
+#     except Exception as e:
+#         conn.rollback()
+#         raise e
+#     finally:
+#         if cur:
+#             cur.close()
+#         conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def update_user_ships(user_data: dict):
@@ -556,6 +696,7 @@ def update_user_ships(user_data: dict):
     参数:
         user_data [dict]
     '''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -591,7 +732,7 @@ def update_user_ships(user_data: dict):
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def update_user_clan(user_data: dict):
@@ -602,6 +743,7 @@ def update_user_clan(user_data: dict):
     参数：
         user_clan_list [account_id,clan_id]
     '''
+    pool = DatabaseConnection.get_pool()
     conn = pool.connection()
     cur = None
     try:
@@ -629,4 +771,4 @@ def update_user_clan(user_data: dict):
     finally:
         if cur:
             cur.close()
-        conn.close()  # 归还连接到连接池
+        conn.close()

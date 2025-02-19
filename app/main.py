@@ -4,7 +4,7 @@ from celery import Celery, signals
 from celery.app.base import logger
 
 from app.core import EnvConfig
-from app.db import init_db_pool, close_db_pool
+from app.db import DatabaseConnection
 
 config = EnvConfig.get_config()
 
@@ -24,14 +24,16 @@ celery_app.conf.update(
     }
 )
 
+celery_app.conf.result_expires = 86400  # 设置任务结果过期时间为 24 小时（86400 秒）
+
 # 初始化
 @signals.worker_ready.connect
 def init_app(**kwargs):
-    init_db_pool()
+    DatabaseConnection.init_pool()
     logger.info('MySQL initialized')
 
 # 释放资源
 @signals.worker_shutdown.connect
 def close_app(**kwargs):
-    close_db_pool()
+    DatabaseConnection.close_pool()
     logger.info('MySQL closed')

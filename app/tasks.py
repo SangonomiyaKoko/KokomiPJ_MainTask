@@ -1,4 +1,5 @@
 from .main import celery_app
+from .utils import HashUtils
 from .db import *
 
 @celery_app.task(name="test")
@@ -86,6 +87,14 @@ def task_check_user_basic_and_info(user_basic: dict, user_info: dict):
         print(result)
     return 'ok'
 
+# @celery_app.task(name="check_clan_basic_and_info")
+# def task_check_clan_basic_and_info(clan_data: dict):
+#     "更新工会basic和info信息，调用来源：ClanUsers功能"
+#     # 更新clan_basic和clan_info表的信息
+#     result = update_clan_basic_and_info(clan_data)
+#     if result.get('code', None) != 1000:
+#         print(result)
+#     return 'ok'
     
 @celery_app.task(name="check_user_info")
 def task_check_user_info(user_data: dict):
@@ -118,16 +127,27 @@ def task_check_user_recent(user_data: dict):
         print(result)
     return 'ok'
 
-@celery_app.task(name="update_clan_users")
-def task_update_clan_users(clan_id: int, hash_value: str, user_data: list):
-    "更新工会的users数据"
-    if len(user_data) != 0:
-        result = update_users_clan(clan_id, user_data)
-        if result.get('code', None) != 1000:
-            print(result)
-            return 'error'
-    result = update_clan_users(clan_id, hash_value, user_data)
-    if result.get('code', None) != 1000:
-        print(result)
-        return 'error'
-    return 'ok'
+# @celery_app.task(name="update_clan_users")
+# def task_update_clan_users(clan_id: int, clan_users: list):
+#     "更新工会的users数据，调用来源：ClanUsers功能"
+#     # 首先检查传入的用户是否都在数据库中存在
+#     result = check_and_insert_missing_users(clan_users)
+#     if result.get('code', None) != 1000:
+#         print(result)
+#         return 'error'
+#     # 批量更新用户达到user_clan表
+#     user_data = []
+#     for user in clan_users:
+#         user_data.append(user[0])
+#     if len(user_data) != 0:
+#         result = update_users_clan(clan_id, user_data)
+#         if result.get('code', None) != 1000:
+#             print(result)
+#             return 'error'
+#     # 最后更新工会内所有用户的数据
+#     hash_value = HashUtils.get_clan_users_hash(user_data)
+#     result = update_clan_users(clan_id, hash_value, user_data)
+#     if result.get('code', None) != 1000:
+#         print(result)
+#         return 'error'
+#     return 'ok'

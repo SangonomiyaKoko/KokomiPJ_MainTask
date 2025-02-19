@@ -1,3 +1,12 @@
+import hashlib
+
+class HashUtils:
+    def get_clan_users_hash(user_list: list):
+        '''传入的user列表获取hash值'''
+        user_list.sort()
+        hash_value = hashlib.sha256(str(user_list).encode('utf-8')).hexdigest()
+        return hash_value
+
 class BinaryParserUtils:
     @classmethod
     def from_user_binary_data_to_dict(self, binary_data: bytes):
