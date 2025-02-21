@@ -43,45 +43,45 @@ def test_db():
             cur.close()
         conn.close()
 
-@ExceptionLogger.handle_database_exception_sync
-def check_game_version(game_data: dict):
-    '''检查游戏版本是否更改
+# @ExceptionLogger.handle_database_exception_sync
+# def check_game_version(game_data: dict):
+#     '''检查游戏版本是否更改
     
-    参数:
-        game_data
-    '''
-    pool = DatabaseConnection.get_pool()
-    conn = pool.connection()
-    cur = None
-    try:
-        conn.begin()
-        cur = conn.cursor(pymysql.cursors.DictCursor)
+#     参数:
+#         game_data
+#     '''
+#     pool = DatabaseConnection.get_pool()
+#     conn = pool.connection()
+#     cur = None
+#     try:
+#         conn.begin()
+#         cur = conn.cursor(pymysql.cursors.DictCursor)
         
-        region_id = game_data['region_id']
-        game_version = game_data['version']
-        cur.execute(
-            f"SELECT game_version FROM {MAIN_DB}.region_version WHERE region_id = %s;",
-            [region_id]
-        )
-        game = cur.fetchone()
-        if game == None:
-            raise ValueError('Table Not Found')
-        else:
-            if game['game_version'] != game_version:
-                cur.execute(
-                    f"UPDATE {MAIN_DB}.region_version SET game_version = %s WHERE region_id = %s;",
-                    [game_version, region_id]
-                )
+#         region_id = game_data['region_id']
+#         game_version = game_data['version']
+#         cur.execute(
+#             f"SELECT game_version FROM {MAIN_DB}.region_version WHERE region_id = %s;",
+#             [region_id]
+#         )
+#         game = cur.fetchone()
+#         if game == None:
+#             raise ValueError('Table Not Found')
+#         else:
+#             if game['game_version'] != game_version:
+#                 cur.execute(
+#                     f"UPDATE {MAIN_DB}.region_version SET game_version = %s WHERE region_id = %s;",
+#                     [game_version, region_id]
+#                 )
         
-        conn.commit()
-        return JSONResponse.API_1000_Success
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        if cur:
-            cur.close()
-        conn.close()
+#         conn.commit()
+#         return JSONResponse.API_1000_Success
+#     except Exception as e:
+#         conn.rollback()
+#         raise e
+#     finally:
+#         if cur:
+#             cur.close()
+#         conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def check_user_basic(user_data: dict):
@@ -467,56 +467,56 @@ def check_user_recent(user_data: dict):
             cur.close()
         conn.close()
 
-@ExceptionLogger.handle_database_exception_sync
-def update_user_ship(user_data: dict):
-    '''检查并更新user_ship表
+# @ExceptionLogger.handle_database_exception_sync
+# def update_user_ship(user_data: dict):
+#     '''检查并更新user_ship表
 
-    参数:
-        user_data [dict]
-    '''
-    pool = DatabaseConnection.get_pool()
-    conn = pool.connection()
-    cur = None
-    try:
-        conn.begin()
-        cur = conn.cursor(pymysql.cursors.DictCursor)
+#     参数:
+#         user_data [dict]
+#     '''
+#     pool = DatabaseConnection.get_pool()
+#     conn = pool.connection()
+#     cur = None
+#     try:
+#         conn.begin()
+#         cur = conn.cursor(pymysql.cursors.DictCursor)
         
-        account_id = user_data['account_id']
-        region_id = user_data['region_id']
-        delete_ship_list = user_data['delete_ship_list']
-        replace_ship_dict = user_data['replace_ship_dict']
-        for del_ship_id in delete_ship_list:
-            cur.execute(
-                f"DELETE FROM {CACHE_DB}.ship_%s "
-                "WHERE region_id = %s AND account_id = %s;",
-                [int(del_ship_id), region_id, account_id]
-            )
-        for update_ship_id, ship_data in replace_ship_dict.items():
-            cur.execute(
-                f"UPDATE {CACHE_DB}.ship_%s SET battles_count = %s, battle_type_1 = %s, battle_type_2 = %s, battle_type_3 = %s, wins = %s, "
-                "damage_dealt = %s, frags = %s, exp = %s, survived = %s, scouting_damage = %s, art_agro = %s, "
-                "planes_killed = %s, max_exp = %s, max_damage_dealt = %s, max_frags = %s "
-                "WHERE region_id = %s AND account_id = %s;",
-                [int(update_ship_id)] + ship_data + [region_id, account_id]
-            )
-            cur.execute(
-                f"INSERT INTO {CACHE_DB}.ship_%s (account_id, region_id, battles_count, battle_type_1, battle_type_2, "
-                "battle_type_3, wins, damage_dealt, frags, exp, survived, scouting_damage, art_agro, planes_killed, "
-                "max_exp, max_damage_dealt, max_frags) "
-                "SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "
-                f"WHERE NOT EXISTS (SELECT 1 FROM {CACHE_DB}.ship_%s WHERE region_id = %s AND account_id = %s);",
-                [int(update_ship_id)] + [account_id, region_id] + ship_data + [int(update_ship_id)] + [region_id, account_id]
-            )
+#         account_id = user_data['account_id']
+#         region_id = user_data['region_id']
+#         delete_ship_list = user_data['delete_ship_list']
+#         replace_ship_dict = user_data['replace_ship_dict']
+#         for del_ship_id in delete_ship_list:
+#             cur.execute(
+#                 f"DELETE FROM {CACHE_DB}.ship_%s "
+#                 "WHERE region_id = %s AND account_id = %s;",
+#                 [int(del_ship_id), region_id, account_id]
+#             )
+#         for update_ship_id, ship_data in replace_ship_dict.items():
+#             cur.execute(
+#                 f"UPDATE {CACHE_DB}.ship_%s SET battles_count = %s, battle_type_1 = %s, battle_type_2 = %s, battle_type_3 = %s, wins = %s, "
+#                 "damage_dealt = %s, frags = %s, exp = %s, survived = %s, scouting_damage = %s, art_agro = %s, "
+#                 "planes_killed = %s, max_exp = %s, max_damage_dealt = %s, max_frags = %s "
+#                 "WHERE region_id = %s AND account_id = %s;",
+#                 [int(update_ship_id)] + ship_data + [region_id, account_id]
+#             )
+#             cur.execute(
+#                 f"INSERT INTO {CACHE_DB}.ship_%s (account_id, region_id, battles_count, battle_type_1, battle_type_2, "
+#                 "battle_type_3, wins, damage_dealt, frags, exp, survived, scouting_damage, art_agro, planes_killed, "
+#                 "max_exp, max_damage_dealt, max_frags) "
+#                 "SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "
+#                 f"WHERE NOT EXISTS (SELECT 1 FROM {CACHE_DB}.ship_%s WHERE region_id = %s AND account_id = %s);",
+#                 [int(update_ship_id)] + [account_id, region_id] + ship_data + [int(update_ship_id)] + [region_id, account_id]
+#             )
         
-        conn.commit()
-        return JSONResponse.API_1000_Success
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        if cur:
-            cur.close()
-        conn.close()
+#         conn.commit()
+#         return JSONResponse.API_1000_Success
+#     except Exception as e:
+#         conn.rollback()
+#         raise e
+#     finally:
+#         if cur:
+#             cur.close()
+#         conn.close()
 
 # @ExceptionLogger.handle_database_exception_sync
 # def check_and_insert_missing_users(users: list):
@@ -689,50 +689,50 @@ def update_user_ship(user_data: dict):
 #             cur.close()
 #         conn.close()
 
-@ExceptionLogger.handle_database_exception_sync
-def update_user_ships(user_data: dict):
-    '''检查并更新user_ships表
+# @ExceptionLogger.handle_database_exception_sync
+# def update_user_ships(user_data: dict):
+#     '''检查并更新user_ships表
 
-    参数:
-        user_data [dict]
-    '''
-    pool = DatabaseConnection.get_pool()
-    conn = pool.connection()
-    cur = None
-    try:
-        conn.begin()
-        cur = conn.cursor(pymysql.cursors.DictCursor)
+#     参数:
+#         user_data [dict]
+#     '''
+#     pool = DatabaseConnection.get_pool()
+#     conn = pool.connection()
+#     cur = None
+#     try:
+#         conn.begin()
+#         cur = conn.cursor(pymysql.cursors.DictCursor)
         
-        account_id = user_data['account_id']
-        if user_data['hash_value']:
-            cur.execute(
-                f"UPDATE {MAIN_DB}.user_ships "
-                "SET battles_count = %s, hash_value = %s, ships_data = %s, updated_at = CURRENT_TIMESTAMP "
-                "WHERE account_id = %s;", 
-                [
-                    user_data['battles_count'], 
-                    user_data['hash_value'], 
-                    BinaryGeneratorUtils.to_user_binary_data_from_dict(user_data['ships_data']), 
-                    account_id
-                ]
-            )
-        else:
-            cur.execute(
-                f"UPDATE {MAIN_DB}.user_ships "
-                "SET battles_count = %s, updated_at = CURRENT_TIMESTAMP "
-                "WHERE account_id = %s;", 
-                [user_data['battles_count'], account_id]
-            )
+#         account_id = user_data['account_id']
+#         if user_data['hash_value']:
+#             cur.execute(
+#                 f"UPDATE {MAIN_DB}.user_ships "
+#                 "SET battles_count = %s, hash_value = %s, ships_data = %s, updated_at = CURRENT_TIMESTAMP "
+#                 "WHERE account_id = %s;", 
+#                 [
+#                     user_data['battles_count'], 
+#                     user_data['hash_value'], 
+#                     BinaryGeneratorUtils.to_user_binary_data_from_dict(user_data['ships_data']), 
+#                     account_id
+#                 ]
+#             )
+#         else:
+#             cur.execute(
+#                 f"UPDATE {MAIN_DB}.user_ships "
+#                 "SET battles_count = %s, updated_at = CURRENT_TIMESTAMP "
+#                 "WHERE account_id = %s;", 
+#                 [user_data['battles_count'], account_id]
+#             )
 
-        conn.commit()
-        return JSONResponse.API_1000_Success
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        if cur:
-            cur.close()
-        conn.close()
+#         conn.commit()
+#         return JSONResponse.API_1000_Success
+#     except Exception as e:
+#         conn.rollback()
+#         raise e
+#     finally:
+#         if cur:
+#             cur.close()
+#         conn.close()
 
 @ExceptionLogger.handle_database_exception_sync
 def update_user_clan(user_data: dict):

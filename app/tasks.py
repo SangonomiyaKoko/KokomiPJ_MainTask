@@ -104,20 +104,20 @@ def task_check_user_info(user_data: dict):
         print(result)
     return 'ok'
 
-@celery_app.task(name="update_user_cache")
-def task_update_user_cache(ships_data: dict, ship_data: dict):
-    "更新用户的船只缓存数据"
-    if ship_data:
-        result = update_user_ship(ship_data)
-        if result.get('code', None) != 1000:
-            print(result)
-            return 'error'
-    if ships_data:
-        result = update_user_ships(ships_data)
-        if result.get('code', None) != 1000:
-            print(result)
-            return 'error'
-    return 'ok'
+# @celery_app.task(name="update_user_cache")
+# def task_update_user_cache(ships_data: dict, ship_data: dict):
+#     "更新用户的船只缓存数据"
+#     if ship_data:
+#         result = update_user_ship(ship_data)
+#         if result.get('code', None) != 1000:
+#             print(result)
+#             return 'error'
+#     if ships_data:
+#         result = update_user_ships(ships_data)
+#         if result.get('code', None) != 1000:
+#             print(result)
+#             return 'error'
+#     return 'ok'
 
 @celery_app.task(name="check_user_recent")
 def task_check_user_recent(user_data: dict):
