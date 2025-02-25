@@ -11,14 +11,6 @@ def task_test():
     else:
         print('MySQL Version: ' + str(result['data']['version']))
     return 'ok'
-
-@celery_app.task(name="check_game_version")
-def task_check_game_version(game_data: dict):
-    "检查数据库中的version是否和当前接口的数据一致"
-    result = check_game_version(game_data)
-    if result.get('code', None) != 1000:
-        print(result)
-    return 'ok'
     
 
 @celery_app.task(name="check_user_basic")
