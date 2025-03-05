@@ -1,5 +1,4 @@
 from .main import celery_app
-from .utils import HashUtils
 from .db import *
 
 @celery_app.task(name="test")
@@ -32,12 +31,14 @@ def task_update_user_data(user_data: dict):
             'last_battle_time': None
         },
         'clan': {
-            'clan_id': None
+            'id': None,
+            'tag': None,
+            'league'
         }
     }
     如果某个数据没有，则value设置为None或者{}，建议统一使用None
     """
-    result = task_update_user_data(user_data)
+    result = update_user_data(user_data)
     if result.get('code', None) != 1000:
         print(result)
     return 'ok'
@@ -69,7 +70,7 @@ def task_update_clan_data(clan_data: dict):
     }
     如果某个数据没有，则value设置为None或者{}，建议统一使用None
     """
-    result = task_update_clan_data(clan_data)
+    result = update_clan_data(clan_data)
     if result.get('code', None) != 1000:
         print(result)
     return 'ok'

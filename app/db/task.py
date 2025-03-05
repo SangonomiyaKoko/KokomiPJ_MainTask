@@ -118,18 +118,6 @@ def update_user_data(user_data: dict):
                             account_id
                         ]
                     )
-            # 更新user_clan表
-            if user_data['clan'] != None and user_data['clan'] != {}:
-                if not user_data['clan']['clan_id']:
-                    cur.execute(
-                        f"UPDATE {MAIN_DB}.user_clan SET clan_id = %s WHERE account_id = %s;",
-                        [user_data['clan']['clan_id'], account_id]
-                    )
-                else:
-                    cur.execute(
-                        f"UPDATE {MAIN_DB}.user_clan SET clan_id = NULL WHERE account_id = %s;",
-                        [account_id]
-                    )
         else:
             # 更新user_basic表
             if user_data['basic'] != None and user_data['basic'] != {}:
@@ -167,81 +155,48 @@ def update_user_data(user_data: dict):
                     f"UPDATE {MAIN_DB}.user_info SET {sql_str}updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;", 
                     params
                 )
-            # 更新user_clan表
-            if user_data['clan'] != None and user_data['clan'] != {}:
-                if not user_data['clan']['clan_id']:
+        if user_data['clan'] != None and user_data['clan'] != {}:
+            if not user_data['clan']['id']:
+                cur.execute(
+                    f"UPDATE {MAIN_DB}.user_clan SET clan_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;",
+                    [account_id]
+                )
+            else:
+                clan_id = user_data['clan']['id']
+                cur.execute(
+                    f"SELECT tag, league FROM {MAIN_DB}.clan_basic WHERE region_id = %s and clan_id = %s;", 
+                    [region_id, clan_id]
+                )
+                clan = cur.fetchone()
+                if clan is None:
+                    # 工会不存在，插入新数据
                     cur.execute(
-                        f"UPDATE {MAIN_DB}.user_clan SET clan_id = %s, updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;",
-                        [user_data['clan']['clan_id'], account_id]
+                        f"INSERT INTO {MAIN_DB}.clan_basic (clan_id, region_id, tag, league) VALUES (%s, %s, %s, %s);", 
+                        [clan_id, region_id, 'N/A', 5]
+                    )
+                    cur.execute(
+                        f"INSERT INTO {MAIN_DB}.clan_info (clan_id) VALUES (%s);", 
+                        [clan_id]
+                    )
+                    cur.execute(
+                        f"INSERT INTO {MAIN_DB}.clan_users (clan_id) VALUES (%s);", 
+                        [clan_id]
+                    )
+                    cur.execute(
+                        f"INSERT INTO {MAIN_DB}.clan_season (clan_id) VALUES (%s);", 
+                        [clan_id]
+                    )
+                    cur.execute(
+                        f"UPDATE {MAIN_DB}.clan_basic SET tag = %s, league = %s WHERE region_id = %s and clan_id = %s;",
+                        [user_data['clan']['tag'], user_data['clan']['league'], region_id, clan_id]
                     )
                 else:
                     cur.execute(
-                        f"UPDATE {MAIN_DB}.user_clan SET clan_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE account_id = %s;",
-                        [account_id]
+                        f"UPDATE {MAIN_DB}.clan_basic SET tag = %s, league = %s, updated_at = CURRENT_TIMESTAMP "
+                        "WHERE region_id = %s and clan_id = %s;",
+                        [user_data['clan']['tag'], user_data['clan']['league'], region_id, clan_id]
                     )
 
-        conn.commit()
-        return JSONResponse.API_1000_Success
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        if cur:
-            cur.close()
-        conn.close()
-
-@ExceptionLogger.handle_database_exception_sync
-def check_clan_basic(clan_data: dict):
-    '''检查clan_basic是否需要更新
-
-    参数：
-        clan_list [clan_id,region_id,tag,league]
-    '''
-    pool = DatabaseConnection.get_pool()
-    conn = pool.connection()
-    cur = None
-    try:
-        conn.begin()
-        cur = conn.cursor(pymysql.cursors.DictCursor)
-
-        clan_id = clan_data['clan_id']
-        region_id = clan_data['region_id']
-        tag = clan_data['tag']
-        league = clan_data['league']
-        cur.execute(
-            f"SELECT tag, league FROM {MAIN_DB}.clan_basic WHERE region_id = %s and clan_id = %s;", 
-            [region_id, clan_id]
-        )
-        clan = cur.fetchone()
-        if clan is None:
-            # 工会不存在，插入新数据
-            cur.execute(
-                f"INSERT INTO {MAIN_DB}.clan_basic (clan_id, region_id, tag, league) VALUES (%s, %s, %s, %s);", 
-                [clan_id, region_id, 'N/A', 5]
-            )
-            cur.execute(
-                f"INSERT INTO {MAIN_DB}.clan_info (clan_id) VALUES (%s);", 
-                [clan_id]
-            )
-            cur.execute(
-                f"INSERT INTO {MAIN_DB}.clan_users (clan_id) VALUES (%s);", 
-                [clan_id]
-            )
-            cur.execute(
-                f"INSERT INTO {MAIN_DB}.clan_season (clan_id) VALUES (%s);", 
-                [clan_id]
-            )
-            cur.execute(
-                f"UPDATE {MAIN_DB}.clan_basic SET tag = %s, league = %s WHERE region_id = %s and clan_id = %s;",
-                [tag, league, region_id, clan_id]
-            )
-        else:
-            cur.execute(
-                f"UPDATE {MAIN_DB}.clan_basic SET tag = %s, league = %s, updated_at = CURRENT_TIMESTAMP "
-                "WHERE region_id = %s and clan_id = %s;",
-                [tag, league, region_id, clan_id]
-            )
-        
         conn.commit()
         return JSONResponse.API_1000_Success
     except Exception as e:
