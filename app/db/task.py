@@ -132,7 +132,7 @@ def update_user_data(user_data: dict):
                         "(%s, %s, FROM_UNIXTIME(%s), FROM_UNIXTIME(%s));", 
                         [account_id, user['username'], user['update_time'], TimeFormat.get_current_timestamp()]
                     )
-                elif user['update_time'] == None:
+                elif user['name_update_time'] == None:
                     cur.execute(
                         f"UPDATE {MAIN_DB}.user_basic SET username = %s WHERE region_id = %s and account_id = %s;",
                         [user_data['basic']['nickname'], region_id, account_id]
@@ -141,8 +141,15 @@ def update_user_data(user_data: dict):
             if user_data['info'] != None and user_data['info'] != {}:
                 sql_str = ''
                 params = []
+                if user_data['info']['is_active']:
+                    active_level = CommonUtils.get_active_level(
+                        is_public=user_data['info']['is_public'],
+                        total_battles=user_data['info']['total_battles'],
+                        last_battle_time=user_data['info']['last_battle_time']
+                    )
+                    user_data['info']['active_level'] = active_level
                 for field in ['is_active', 'active_level', 'is_public', 'total_battles', 'last_battle_time']:
-                    if (user_data['info'][field] != None) and (user_data['info'][field] != user[field]):
+                    if (field not in user_data['info']) and (user_data['info'][field] != None) and (user_data['info'][field] != user[field]):
                         if field != 'last_battle_time':
                             sql_str += f'{field} = %s, '
                             params.append(['info'][field])
