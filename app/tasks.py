@@ -12,7 +12,7 @@ def task_test():
     return 'ok'
 
 @celery_app.task(name="update_user_data")
-def task_update_user_data(user_data: dict):
+def task_update_user_data(user_datas: dict | list):
     """更新用户数据库的数据
 
     更新包括user_basic, user_info, user_clan数据表
@@ -38,7 +38,7 @@ def task_update_user_data(user_data: dict):
     }
     如果某个数据没有，则value设置为None或者{}，建议统一使用None
     """
-    result = update_user_data(user_data)
+    result = update_user_data(user_datas)
     if result.get('code', None) != 1000:
         print(result)
     return 'ok'
