@@ -297,11 +297,11 @@ def update_clan_data(clan_datas: dict | list):
                 # 更新clan_basic表
                 if clan_data['basic'] != None and clan_data['basic'] != {}:
                     if (
-                        clan_data['tag'] != clan['tag'] or
-                        clan_data['league'] != clan['league1']
+                        clan_data['basic']['tag'] != clan['tag'] or
+                        clan_data['basic']['league'] != clan['league1']
                     ):
                         cur.execute(
-                            f"UPDATE {MAIN_DB}.clan_basic SET tag = %s, league = %s WHERE region_id = %s, updated_at = CURRENT_TIMESTAMP and clan_id = %s;",
+                            f"UPDATE {MAIN_DB}.clan_basic SET tag = %s, league = %s, updated_at = CURRENT_TIMESTAMP WHERE region_id = %s and clan_id = %s;",
                             [clan_data['basic']['tag'], clan_data['basic']['league'], region_id, clan_id]
                         )
                 # 更新clan_info表
@@ -312,9 +312,9 @@ def update_clan_data(clan_datas: dict | list):
                             [clan_data['info']['is_active'], clan_id]
                         )
                     elif (
-                        clan_data['season_number'] != clan['season'] or
-                        clan_data['public_rating'] != clan['public_rating'] or
-                        clan_data['last_battle_at'] != clan['info_last_battle_time']
+                        clan_data['info']['season_number'] != clan['season'] or
+                        clan_data['info']['public_rating'] != clan['public_rating'] or
+                        clan_data['info']['last_battle_at'] != clan['info_last_battle_time']
                     ):
                         cur.execute(
                             f"UPDATE {MAIN_DB}.clan_info SET is_active = %s, season = %s, public_rating = %s, league = %s, "
